@@ -1,30 +1,46 @@
 const express = require('express')
 const sqlite = require('sqlite3');
-const { urlencoded } = require('body-parser');
+const bodyParser = require('body-parser')
 require('dotenv').config()
 
-const db = new sqlite.Database('songsAPI');
+const db = new sqlite.Database('./db/songsAPI');
 
 const app = express()
-
 const port = process.env.PORT || 5001
-const urlParser = urlencoded()
+
+const jsonParser = bodyParser.json();
 
 app.get('/songs', (req, res) => {
     db.serialize(function () {
-        db.all("SELECT * FROM songs", function (err, rows) {
+        if (req.query.order_by) {
+            db.all("SELECT * FROM songs ORDER BY " + req.query.order_by, function(err, rows) {
+                if (err) {
+                    console.log(err)
+                }
+                res.json(rows)
+            })
+        } else {
+            db.all("SELECT * FROM songs", function(err, rows) {
+                if (err) {
+                    console.log(err)
+                }
+                res.json(rows)
+            })
+        }
+
+        function handler(err, rows) {
             if (err) {
                 console.log(err)
             }
             res.json(rows)
-        })
+        }
     })
 })
 
-app.get('/song/', urlParser, (req, res) => {
-    if (req.body.id) {
+app.get('/song/', (req, res) => {
+    if (req.query.id) {
         db.serialize(function () {
-            db.get('SELECT * FROM SONGS WHERE id = ' + req.body.id, function (err, row) {
+            db.get('SELECT * FROM SONGS WHERE id = ' + req.query.id, function (err, row) {
                 if (err) {
                     res.json({ err: err })
                 } else {
@@ -37,22 +53,57 @@ app.get('/song/', urlParser, (req, res) => {
     }
 })
 
-app.post('/song/', urlParser, (req, res) => {
-    if (!req.body.title || !req.body.album || !req.body.artist) {
+app.post('/song/', (req, res) => {
+    if (typeof req.query.title == "undefined" || typeof req.query.album == "undefined" || typeof req.query.artist == "undefined") {
         res.json({ err: "missing a required field" });
     } else {
         db.serialize(function () {
-            let { title, album, artist, track_num, length, source } = req.body;
-            db.run("INSERT INTO songs (title, album, artist, track_num, length, source) VALUES (" + `\'${title}\', \'${album}\', \'${artist}\', \'${track_num}\', \'${length}\', \'${source}\')`);
+            function parseArray(arr, quote = false) {
+                if (quote) {
+                    let tempArr = [];
+                    arr.forEach(e => tempArr.push(`'${e}'`))
+
+                    if (arr.length > 2) {
+                        let tempArr = [];
+                        arr.forEach(e => tempArr.push(`'${e}'`))
+                        return tempArr.join(', ');
+                    } else {
+                        let tempArr = [];
+                        arr.forEach(e => tempArr.push(`'${e}'`))
+                        return tempArr.join(' ');
+                    }
+                } else {
+                    if (arr.length > 2) {
+                        return arr.join(', ')
+                    } else {
+                        return arr.join(' ')
+                    }
+                }
+            }
+
+            let keysArr = [];
+            let valuesArr = [];
+            Object.keys(req.query).forEach(e => {
+                if (e != "id") {
+                    keysArr.push(e)
+                    valuesArr.push(req.query[e])
+                }
+            })
+            db.run("INSERT INTO songs (" + parseArray(keysArr) + ") VALUES (" + parseArray(valuesArr, true) + ")", function (err) {
+                if (err) {
+                    console.log(err)
+                    res.json(err)
+                }
+            });
         });
-        res.json(req.body);
+        res.json(req.query)
     }
 })
 
-app.put('/song/', urlParser, (req, res) => {
-    if (req.body.id) {
+app.put('/song/', (req, res) => {
+    if (req.query.id) {
         db.serialize(function () {
-            db.get("SELECT * FROM songs WHERE id = " + req.body.id.toString(), function (err, row) {
+            db.get("SELECT * FROM songs WHERE id = " + req.query.id.toString(), function (err, row) {
                 if (err) {
                     console.log(err)
                 } else {
@@ -78,18 +129,18 @@ app.put('/song/', urlParser, (req, res) => {
 
                     let keysArr = [];
                     let valuesArr = [];
-                    Object.keys(req.body).forEach(e => {
+                    Object.keys(req.query).forEach(e => {
                         if (e != "id") {
                             keysArr.push(e)
-                            valuesArr.push(req.body[e])
+                            valuesArr.push(req.query[e])
                         }
                     })
 
-                    db.run("UPDATE songs SET " + splitAndJoin(keysArr, valuesArr) + " WHERE id = " + req.body.id, function (err) {
+                    db.run("UPDATE songs SET " + splitAndJoin(keysArr, valuesArr) + " WHERE id = " + req.query.id, function (err) {
                         if (err) {
                             res.json(err)
                         } else {
-                            res.json({ success: 'row updated'})
+                            res.json({ success: 'row updated' })
                         }
                     })
                 }
@@ -98,10 +149,10 @@ app.put('/song/', urlParser, (req, res) => {
     }
 })
 
-app.delete('/song/', urlParser, (req, res) => {
-    db.get('SELECT * FROM SONGS WHERE id = ' + req.body.id, function (err, row) {
+app.delete('/song/', (req, res) => {
+    db.get('SELECT * FROM SONGS WHERE id = ' + req.query.id, function (err, row) {
         if (row) {
-            db.run("DELETE FROM songs WHERE id = " + req.body.id, function (err, row) {
+            db.run("DELETE FROM songs WHERE id = " + req.query.id, function (err, row) {
                 res.json({ success: "row deleted" })
             })
         } else {
