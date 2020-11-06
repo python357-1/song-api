@@ -1,6 +1,6 @@
 const express = require('express')
 const sqlite = require('sqlite3');
-const { json } = require('body-parser');
+const { urlencoded } = require('body-parser');
 require('dotenv').config()
 
 const db = new sqlite.Database('songsAPI');
@@ -8,7 +8,7 @@ const db = new sqlite.Database('songsAPI');
 const app = express()
 
 const port = process.env.PORT || 5001
-const jsonParser = json()
+const urlParser = urlencoded()
 
 app.get('/songs', (req, res) => {
     db.serialize(function () {
@@ -21,7 +21,7 @@ app.get('/songs', (req, res) => {
     })
 })
 
-app.get('/song/', jsonParser, (req, res) => {
+app.get('/song/', urlParser, (req, res) => {
     if (req.body.id) {
         db.serialize(function () {
             db.get('SELECT * FROM SONGS WHERE id = ' + req.body.id, function (err, row) {
@@ -37,7 +37,7 @@ app.get('/song/', jsonParser, (req, res) => {
     }
 })
 
-app.post('/song/', jsonParser, (req, res) => {
+app.post('/song/', urlParser, (req, res) => {
     if (!req.body.title || !req.body.album || !req.body.artist) {
         res.json({ err: "missing a required field" });
     } else {
@@ -49,7 +49,7 @@ app.post('/song/', jsonParser, (req, res) => {
     }
 })
 
-app.put('/song/', jsonParser, (req, res) => {
+app.put('/song/', urlParser, (req, res) => {
     if (req.body.id) {
         db.serialize(function () {
             db.get("SELECT * FROM songs WHERE id = " + req.body.id.toString(), function (err, row) {
@@ -98,7 +98,7 @@ app.put('/song/', jsonParser, (req, res) => {
     }
 })
 
-app.delete('/song/', jsonParser, (req, res) => {
+app.delete('/song/', urlParser, (req, res) => {
     db.get('SELECT * FROM SONGS WHERE id = ' + req.body.id, function (err, row) {
         if (row) {
             db.run("DELETE FROM songs WHERE id = " + req.body.id, function (err, row) {
